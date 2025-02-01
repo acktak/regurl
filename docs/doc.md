@@ -5,7 +5,7 @@ Cette application est un projet Python pour extraire des informations d'une page
 
 ## Structure du projet
 Voici la structure du projet :
-.
+```
 ├── docs/
 │   └── doc.md
 ├── src/
@@ -19,6 +19,7 @@ Voici la structure du projet :
 ├── main.py
 ├── README.md
 └── requirements.txt
+```
 
 
 ## Modules
