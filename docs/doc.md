@@ -39,7 +39,7 @@ Ce module contient la classe [`RegexUtils`](../src/core/regex_utils.py) qui four
 - `get_pattern(name)`: Méthode statique pour récupérer une expression régulière par nom.
 
 ### `src/gui/app.py`
-Ce module contient la classe [`TkinterApp`](../src/gui/app.py) qui crée une interface graphique pour interagir avec le scraper et les expressions régulières.
+Ce module contient la classe [`WebScraperApp`](../src/gui/app.py) qui crée une interface graphique pour interagir avec le scraper et les expressions régulières.
 
 #### Classe `TkinterApp`
 - `__init__(self, root)`: Initialise l'application Tkinter.
