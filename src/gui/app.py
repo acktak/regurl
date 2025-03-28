@@ -1,9 +1,33 @@
 import tkinter as tk
-from tkinter import ttk
 import queue
+from tkinter import ttk, filedialog
+import csv
 import threading
 from src.core.scraper import Scraper
 import darkdetect
+import math
+
+class AnimatedLoader:
+    def __init__(self, root):
+        self.canvas = tk.Canvas(root, width=60, height=60, highlightthickness=0)
+        self.canvas.pack(pady=10)
+
+        self.arc = self.canvas.create_arc(10, 10, 50, 50, start=0, extent=270, outline="royalblue", width=5, style=tk.ARC)
+        self.angle = 0
+        self.animating = False
+
+    def start(self):
+        self.animating = True
+        self.animate()
+
+    def stop(self):
+        self.animating = False
+
+    def animate(self):
+        if self.animating:
+            self.angle = (self.angle + 15) % 360
+            self.canvas.itemconfig(self.arc, start=self.angle)
+            self.canvas.after(50, self.animate)
 
 class WebScraperApp:
     def __init__(self, root):
@@ -12,52 +36,60 @@ class WebScraperApp:
         self.root.geometry("600x450")
 
         # 📌 Détection du mode système au lancement
-        self.dark_mode = darkdetect.isDark()
+        #self.dark_mode = darkdetect.isDark()
 
         # Entrée URL
-        self.url_entry = tk.Entry(root, width=50)
+        self.url_entry = tk.Entry(root, width=50, font=("Arial", 10))
         # self.url_entry.insert(0, "Enter an URL...")
         self.create_placeholder(self.url_entry, "Enter an URL...")
         self.url_entry.pack(pady=5)
 
         # Entrée Regex
-        self.regex_entry = tk.Entry(root, width=50)
+        self.regex_entry = tk.Entry(root, width=50, font=("Arial", 10))
         self.create_placeholder(self.regex_entry, "Enter a regex...")
         self.regex_entry.pack(pady=5)
 
-        # Mode récursif et regex par défaut
+        # Mode récursif 
         self.recursive_mode = tk.BooleanVar()
-        self.default_regex = tk.BooleanVar()
-
-        tk.Checkbutton(root, text="Recursive search", variable=self.recursive_mode).pack()
-        tk.Checkbutton(root, text="Use default regex", variable=self.default_regex).pack()
+        tk.Checkbutton(root, text="Recursive search", variable=self.recursive_mode).pack(pady=5)
+        
+        # Liste déroulante pour sélectionner une regex par défaut
+        self.regex_options = {"Email": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+                              "Téléphone": r"\+?[0-9]{1,4}?[-.\s]?\(?[0-9]{1,3}?\)?[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,9}",
+                              "Date": r"\b\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4}\b"}
+        
+        self.regex_var = tk.StringVar()
+        self.regex_dropdown = ttk.Combobox(root, textvariable=self.regex_var, values=list(self.regex_options.keys()),width=22)
+        self.regex_dropdown.set("Select a predefined regex")
+        self.regex_dropdown.pack(pady=25)
+        self.regex_dropdown.bind("<<ComboboxSelected>>", self.set_regex)
 
         # Boutons
         button_frame = tk.Frame(root)
         button_frame.pack(pady=10)
 
         self.search_button = tk.Button(button_frame, text="Search", command=self.start_search)
-        self.search_button.pack(side=tk.LEFT, padx=5)
+        self.search_button.grid(row=0, column=0, padx=5)
 
         self.clear_button = tk.Button(button_frame, text="Clear", command=self.clear_results)
-        self.clear_button.pack(side=tk.LEFT, padx=5)
+        self.clear_button.grid(row=0, column=1, padx=5)
 
         self.stop_button = tk.Button(button_frame, text="Stop", command=self.stop_search, state=tk.DISABLED)
-        self.stop_button.pack(side=tk.LEFT, padx=5)
+        self.stop_button.grid(row=0, column=2, padx=5)
+
+        self.export_button = tk.Button(button_frame, text="Export CSV", command=self.export_to_csv)
+        self.export_button.grid(row=0, column=3, padx=5)
 
         # Label pour afficher les erreurs
-        self.error_label = tk.Label(self.root, text="")
+        self.error_label = tk.Label(self.root, text="", foreground="red")
         self.error_label.pack(pady=10)
 
-        # Loader animé (Cercle qui tourne)
-        self.canvas = tk.Canvas(root, width=50, height=50, highlightthickness=0)
-        self.canvas.pack(pady=5)
-        self.arc = self.canvas.create_arc(10, 10, 40, 40, start=0, extent=90, outline="blue", width=5)
-        self.animation_angle = 0
-        self.animating = False
-
-        # Tableau de résultats
-        self.results_list = ttk.Treeview(root, columns=("url", "regex", "match"), show="headings")
+        #loader
+        self.loader = AnimatedLoader(root)
+        style = ttk.Style()
+        style.configure("Treeview", background="#ccffcc", fieldbackground="#ccffcc")  # Vert clair
+        # Tableau de résultats avec fond vert clair
+        self.results_list = ttk.Treeview(root, columns=("url", "regex", "match"), show="headings", height=8, style="Treeview")
         self.results_list.heading("url", text="URL")
         self.results_list.heading("regex", text="Regex Pattern")
         self.results_list.heading("match", text="Matched Regex")
@@ -66,6 +98,13 @@ class WebScraperApp:
         # File d'attente pour récupérer les résultats du Scraper
         self.result_queue = queue.Queue()
         self.stop_event = threading.Event()  # Flag pour arrêter la recherche
+
+    def set_regex(self, event):
+        """ Met à jour le champ regex avec la regex sélectionnée """
+        selected_regex = self.regex_var.get()
+        if selected_regex in self.regex_options:
+            self.regex_entry.delete(0, tk.END)
+            self.regex_entry.insert(0, self.regex_options[selected_regex])
 
     def start_search(self):
         """Lance le scraping dans un thread séparé"""
@@ -77,23 +116,33 @@ class WebScraperApp:
         base_url = self.url_entry.get()
         regex = self.regex_entry.get()
         recursive = self.recursive_mode.get()
-        default_regex = self.default_regex.get()
 
-        # Activer le loader et le bouton STOP
-        self.animating = True
-        self.animate_loader()
+        # loader
+        self.loader.start()
         self.stop_button.config(state=tk.NORMAL)
 
         # Réinitialiser l'event STOP
         self.stop_event.clear()
 
         # Lancer le scraper dans un thread
-        self.scraper = Scraper(base_url, regex, recursive, default_regex, self.result_queue, self.stop_event)
+        self.scraper = Scraper(base_url, regex, recursive, self.result_queue, self.stop_event)
         self.scraper_thread = threading.Thread(target=self.scraper.search_regex)
         self.scraper_thread.start()
 
         # Vérifier la queue régulièrement pour afficher les résultats
         self.check_queue()
+
+    def export_to_csv(self):
+        """ Exporte les résultats dans un fichier CSV """
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", 
+        filetypes=[("CSV files", "*.csv"), ("All Files", "*.*")])
+        if not file_path:
+            return
+        with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(["URL", "Regex Pattern", "Matched Regex"])
+            for item in self.results_list.get_children():
+                writer.writerow(self.results_list.item(item)['values'])
 
     def stop_search(self):
         """Demande l'arrêt du scraper"""
@@ -124,9 +173,9 @@ class WebScraperApp:
         if self.scraper_thread.is_alive():
             self.root.after(500, self.check_queue)
         else:
-            self.animating = False  # Arrêter l'animation une fois terminé
-            self.stop_button.config(state=tk.DISABLED) # On desactive le bouton stop
-
+            self.loader.stop()  # Arrêter le loader quand la recherche est finie
+            self.stop_button.config(state=tk.DISABLED)
+            
     def clear_results(self):
         """Vide le tableau des résultats"""
         for item in self.results_list.get_children():
@@ -136,7 +185,7 @@ class WebScraperApp:
         """ Supprime le texte du champ lorsqu'on clique dessus """
         if event.widget.get() == event.widget.placeholder_text:
             event.widget.delete(0, tk.END)
-            event.widget.config(fg="white")  # Change la couleur du texte en noir
+            event.widget.config(fg="black")  # Change la couleur du texte en noir
 
     def on_entry_focus_out(self, event):
         """ Remet le placeholder si le champ est vide """
@@ -152,22 +201,3 @@ class WebScraperApp:
 
         entry.bind("<FocusIn>", self.on_entry_focus_in)
         entry.bind("<FocusOut>", self.on_entry_focus_out)
-
-
-
-""""
-
-    def export_csv(self):
-        if not self.results:
-            messagebox.showwarning("Warning", "No results to export")
-            return
-
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
-        if file_path:
-            with open(file_path, "w", newline="", encoding="utf-8") as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerow(["Results"])
-                for result in self.results:
-                    writer.writerow([result])
-            messagebox.showinfo("Success", "Results exported successfully!")
-"""
