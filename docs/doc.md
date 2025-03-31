@@ -21,7 +21,6 @@ Voici la structure du projet :
 └── requirements.txt
 ```
 
-
 ## Modules
 
 ### `src/core/scraper.py`
@@ -37,6 +36,7 @@ Ce module contient la classe [`RegexUtils`](../src/core/regex_utils.py) qui four
 #### Classe `RegexUtils`
 - `PREDEFINED_PATTERNS`: Dictionnaire contenant des expressions régulières prédéfinies.
 - `get_pattern(name)`: Méthode statique pour récupérer une expression régulière par nom.
+- `get_all_keys()`: Méthode statique pour récupérer tous les noms correspondant au expressions régulière
 
 ### `src/gui/app.py`
 Ce module contient la classe [`WebScraperApp`](../src/gui/app.py) qui crée une interface graphique pour interagir avec le scraper et les expressions régulières.
@@ -55,37 +55,3 @@ Ce fichier contient des tests pour la classe [`Scraper`](../src/core/scraper.py)
 
 #### Classe `TestScraper`
 - `test_scrape_valid_url(self)`: Teste la méthode `scrape` avec une URL valide.
-
-
-## Configuration de l'environnement virtuel
-Pour créer et activer un environnement virtuel, suivez les étapes ci-dessous :
-
-1. Créez un environnement virtuel :
-    ```sh
-    python -m venv venv
-    ```
-
-2. Activez l'environnement virtuel :
-    - Sur Windows :
-        ```sh
-        .\venv\Scripts\activate
-        ```
-    - Sur macOS et Linux :
-        ```sh
-        source venv/bin/activate
-        ```
-
-3. Installez les dépendances :
-    ```sh
-    pip install -r requirements.txt
-    ```
-
-4. Lancez l'application :
-    ```sh
-    python main.py
-    ```
-
-5. Pour désactiver l'environnement virtuel :
-    ```sh
-    deactivate
-    ```

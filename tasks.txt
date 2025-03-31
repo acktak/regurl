@@ -1,5 +1,0 @@
-To do : 
-
-- A Module that allow to retrieve all the pages of a website -> save the founded pages
-- A module that search for a matching regex on a list of URI
-- A GUI interface using both modules 
